@@ -1,0 +1,137 @@
+go atlas
+
+mesh width=100
+
+x.m l=0.0  s=0.5
+x.m l=1.0  s=0.1
+x.m l=3.0  s=0.05
+x.m l=4.0  s=0.02
+x.m l=5.0  s=0.02
+x.m l=7.0  s=0.02
+x.m l=8.0  s=0.05
+x.m l=12.0 s=0.1
+x.m l=19.0 s=0.2
+x.m l=20.0 s=0.5
+
+y.m l=-0.2  s=0.02
+y.m l=-0.1  s=0.02
+y.m l=0.0   s=0.05
+y.m l=0.2   s=0.02
+y.m l=0.4   s=0.02
+y.m l=0.45  s=0.01
+y.m l=0.47  s=0.005
+y.m l=0.5   s=0.001
+y.m l=0.512 s=0.001
+y.m l=0.6   s=0.02
+y.m l=3.0   s=0.5
+
+region num=1 x.min=0   x.max=20  y.min=0.512 y.max=3.0  mat=GaN
+region num=2 x.min=0   x.max=20  y.min=0.5   y.max=0.512 mat=AlGaN x.comp=0.20
+region num=3 x.min=4.0 x.max=5.0 y.min=0.4   y.max=0.5  mat=GaN
+region num=4 x.min=0   x.max=4.0 y.min=0.0   y.max=0.5  mat=Si3N4
+region num=5 x.min=5.0 x.max=20  y.min=0.0   y.max=0.5  mat=Si3N4
+region num=6 x.min=0   x.max=20  y.min=-0.2  y.max=0.0  mat=Si3N4
+
+elec num=1 name=source x.min=0.0  x.max=1.0  y.min=0.0  y.max=0.512
+elec num=2 name=drain  x.min=19.0 x.max=20   y.min=0.0  y.max=0.512
+elec num=3 name=gate   x.min=4.0  x.max=5.0  y.min=0.0  y.max=0.45
+elec num=4 name=gate   x.min=5.0  x.max=8.0  y.min=0.0  y.max=0.2
+elec num=5 name=source x.min=1.0  x.max=12.0 y.min=-0.2 y.max=-0.1
+elec num=6 name=source x.min=0.0  x.max=1.0  y.min=-0.2 y.max=0.0
+
+doping uniform p.type conc=1e18   x.min=4.0  x.max=5.0 y.min=0.47 y.max=0.5
+doping uniform p.type conc=1.5e19 x.min=4.0  x.max=5.0 y.min=0.40 y.max=0.47
+doping uniform n.type conc=1e21   x.min=0.0  x.max=1.0 y.min=0.5  y.max=0.6
+doping uniform n.type conc=1e21   x.min=19.0 x.max=20  y.min=0.5  y.max=0.6
+
+contact name=gate
+contact name=source work=3.93
+contact name=drain  work=3.93
+
+models srh fldmob print
+mobility albrct.n
+model polarization calc.strain polar.scale=1.0
+
+output con.band val.band charge polar.charge band.par E.MOBILITY E.VELOCITY
+method gummel newton itlimit=50 trap maxtrap=15 climit=1e-4
+
+solve init
+save outf=ganon_gan_fp_0.str
+
+solve vdrain=1.0
+solve vdrain=3.0
+solve vdrain=5.0
+solve name=gate vgate=0.0 vfinal=-2 vstep=-0.5
+
+log outf=ganon_gan_fp_transfer.log
+solve name=gate vgate=-2.0 vfinal=6 vstep=0.1
+log off
+
+set on_vstop = 15
+set on_vinc  = 0.2
+
+solve init
+solve name=gate vgate=0.0 vfinal=2 vstep=0.5
+log outf=ganon_gan_fp_Vg2.log
+solve name=drain vdrain=0.0 vfinal=$on_vstop vstep=$on_vinc
+log off
+
+solve init
+solve name=gate vgate=0.0 vfinal=4 vstep=0.5
+log outf=ganon_gan_fp_Vg4.log
+solve name=drain vdrain=0.0 vfinal=$on_vstop vstep=$on_vinc
+log off
+
+solve init
+solve name=gate vgate=0.0 vfinal=6 vstep=0.5
+log outf=ganon_gan_fp_Vg6.log
+solve name=drain vdrain=0.0 vfinal=$on_vstop vstep=$on_vinc
+log off
+
+go atlas
+mesh inf=ganon_gan_fp_0.str width=100
+region modify num=1 substrate
+
+contact name=gate
+contact name=source work=3.93
+contact name=drain  work=3.93
+
+models srh fldmob lat.temp print
+mobility albrct.n
+model polarization calc.strain polar.scale=1.0
+
+material material=GaN tcon.alma hc.alma
+thermcontact num=1 x.min=0 x.max=20 y.min=3 y.max=3 ext.temp=300 alpha=1e7
+
+output con.band val.band charge polar.charge band.par E.MOBILITY E.VELOCITY
+method newton trap itlimit=150 maxtrap=50 climit=1e-3 dvmax=0.1
+
+solve init
+solve name=gate vgate=0.0 vfinal=2 vstep=0.1
+log outf=ganon_gan_fp_Vg2_lat.log
+solve name=drain vdrain=0.0 vfinal=8 vstep=0.1
+log off
+
+solve init
+solve name=gate vgate=0.0 vfinal=2.5 vstep=0.1
+solve name=gate vgate=2.5 vfinal=3.0 vstep=0.05
+log outf=ganon_gan_fp_Vg3_lat.log
+solve name=drain vdrain=0.0 vfinal=8 vstep=0.1
+log off
+
+solve init
+solve name=gate vgate=0.0 vfinal=3.0 vstep=0.1
+solve name=gate vgate=3.0 vfinal=4.0 vstep=0.05
+log outf=ganon_gan_fp_Vg4_lat.log
+solve name=drain vdrain=0.0 vfinal=8 vstep=0.1
+log off
+
+save outf=ganon_gan_fp_thermal_peak.str
+
+tonyplot ganon_gan_fp_transfer.log
+tonyplot -overlay ganon_gan_fp_Vg2.log     ganon_gan_fp_Vg4.log     ganon_gan_fp_Vg6.log
+tonyplot -overlay ganon_gan_fp_Vg2_lat.log ganon_gan_fp_Vg3_lat.log ganon_gan_fp_Vg4_lat.log
+tonyplot ganon_gan_fp_0.str
+tonyplot ganon_gan_fp_thermal_peak.str
+
+quit
