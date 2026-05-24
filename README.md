@@ -18,7 +18,7 @@ A 650 V-class enhancement-mode dual field plate p-GaN HEMT, simulated in Silvaco
 | Phase | Tools | Owner |
 |-------|-------|-------|
 | 1 — Device TCAD | Silvaco ATLAS | MangalDragon (current) |
-| 2 — System | IC-CAP, ADS, Q3D, Icepak, MATLAB/Simulink | Ujwal, Shreyash, Sheehari |
+| 2 — System | IC-CAP, ADS, Q3D, Icepak, MATLAB/Simulink | Raghul, Ujwal, Shreyash, Sheehari |
 
 Faculty advisor: Dr. Shashank Kumar Dubey.
 
