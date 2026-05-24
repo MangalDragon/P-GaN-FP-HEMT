@@ -1,17 +1,99 @@
-go atlas
+# ============================================================================
+# ganon_gan_fp.in — 650 V Dual Field Plate Enhancement-Mode p-GaN HEMT
+# ============================================================================
+# Project : Phase 1 TCAD baseline for the Major Project
+#           "Design and Optimization of a High-Power and High-Frequency
+#            GaN HEMT Inverter for EVs" (3L-ANPC, 800 V bus, >200 kHz f_sw)
+# Tool    : Silvaco ATLAS 5.28.1.R (TCAD 2019)
+# Author  : MangalDragon
+# Advisor : Divakar Sir
+#
+# Device  : Enhancement-mode p-GaN gate HEMT with DUAL field plates
+#             - GFP (gate field plate) : elec 4, x=5..8 um, y=0..0.2 um
+#             - SFP (source field plate, top metal) : elec 5, x=1..12, y=-0.2..-0.1
+#             - AlGaN barrier 12 nm at 20% Al composition
+#             - p-GaN cap 100 nm under gate, graded p-doping
+#             - n+ source/drain ohmics, 1e21 cm-3
+#             - Fe-compensated buffer (1e17 cm-3 deep acceptor, Ec-0.7 eV)
+#             - SiN passivation top + sidewalls
+#             - GaN substrate, 300 K thermcontact at y=3 um (lat.temp pass)
+#
+# Targets : Vth ~ 1.5..2 V, BVdss > 650 V, Idmax @ Vg=4V > 0.5 A/mm
+#
+# Mesh    : 1 nm vertical refinement at AlGaN/GaN interface (y=0.5..0.512)
+#           20 nm lateral refinement at gate edges (x=4..5 and x=5..7)
+#           Smooth y-transition through the buffer to y=3 um
+#
+# Models  : srh + fldmob + albrct.n + fermi (degenerate 2DEG)
+#           + polarization w/ calc.strain (intrinsic 2DEG)
+#           + traps (buffer Fe + AlGaN-side surface donor)
+#           + impact selb         (breakdown pass only, separate IMPACT stmt)
+#           + lat.temp + tcon.alma + hc.alma  (self-heating pass only)
+#
+# Output  : 4 analysis groups (DC isothermal, AC, breakdown, self-heating)
+#           Logs feed IC-CAP for ASM-HEMT compact-model extraction.
+#
+# Manual cross-checks (atlas_users 2019, ATLAS 5.28.1.R):
+#   - p.1610  AC SOLVE syntax: solve ac freq= fstep= mult.f nfsteps= vss=
+#   - p.1609  AC requires "method newton carriers=2" (full Newton)
+#   - p.1617  Breakdown idiom: "impact selb" is a separate statement,
+#             not a parameter on "models"
+#   - p.1629  TRAP syntax: "trap acceptor|donor e.level= density= degen= ..."
+#   - p.473   Extract idiom: xintercept(maxslope(curve(v."gate", abs(i."drain"))))
+#
+# Hard physical limit (do NOT propose changes to "fix" this):
+#   Vgs is bandgap-limited at ~4 V. The metal/p-GaN/AlGaN gate forms an
+#   intrinsic diode that turns on at Eg(GaN)=3.4 eV; past that, hole
+#   injection collapses gm. The 4 V transfer ceiling is correct physics
+#   shared with every commercial p-GaN HEMT.
+# ============================================================================
 
-mesh width=100
+go atlas simflags="-P 2"
 
-x.m l=0.0  s=0.5
-x.m l=1.0  s=0.1
-x.m l=3.0  s=0.05
-x.m l=4.0  s=0.02
-x.m l=5.0  s=0.02
-x.m l=7.0  s=0.02
-x.m l=8.0  s=0.05
-x.m l=12.0 s=0.1
-x.m l=19.0 s=0.2
-x.m l=20.0 s=0.5
+# ----------------------------------------------------------------------------
+# Parameterized values (edit these for sensitivity sweeps; geometry is
+# kept hardcoded below because mesh/region/electrode coords are coupled).
+# ----------------------------------------------------------------------------
+set Wmesh        = 100        # device width into page (um)
+set Alcomp       = 0.20       # AlGaN Al fraction
+set NpgaN_top    = 1e18       # p-GaN top doping  (cm-3, ohmic to gate metal)
+set NpgaN_bot    = 1.5e19     # p-GaN bulk doping (cm-3)
+set Nplus        = 1e21       # n+ ohmic doping   (cm-3)
+set Nfe          = 1e17       # Fe deep acceptor  (cm-3) buffer trap density
+# Note: Nsurf_vol is calibrated for Alcomp=0.20. If you sweep Al composition
+# for sensitivity analysis, recalibrate (~linear in Al fraction is a fair
+# first-order approximation).
+set Nsurf_vol    = 1e18       # AlGaN-side surface donor trap (cm-3, vol-eq.)
+
+set on_vstop     = 15         # output sweep Vd stop, isothermal pass (V)
+set on_vinc      = 0.2        # output sweep Vd step, isothermal pass (V)
+
+# Breakdown compliance: with mesh WIDTH=100 set, ATLAS reports current in
+# Amperes for the full 100 um device. 1e-3 A = 1 mA total = 10 uA/um, the
+# standard threshold for declaring breakdown on a 650 V class GaN HEMT.
+set bv_vstop     = 750        # breakdown sweep Vd stop (V)
+set bv_vinc      = 2.0        # breakdown sweep Vd step (V) — fine near knee
+set bv_compl     = 1e-3       # breakdown current compliance (A, total device)
+
+set ac_fstart    = 1e3        # AC sweep start frequency (Hz)
+set ac_fstep     = 1.7783     # multiplicative step = 10^(1/4), 4 pts/decade
+set ac_npts      = 28         # 7 decades x 4 pts/decade = 28 (1 kHz..10 GHz)
+
+# ----------------------------------------------------------------------------
+# MESH (lateral + vertical, with critical 1 nm refinement at the 2DEG)
+# ----------------------------------------------------------------------------
+mesh width=$Wmesh
+
+x.m l=0.0   s=0.5
+x.m l=1.0   s=0.1
+x.m l=3.0   s=0.05
+x.m l=4.0   s=0.02
+x.m l=5.0   s=0.02
+x.m l=7.0   s=0.02
+x.m l=8.0   s=0.05
+x.m l=12.0  s=0.1
+x.m l=19.0  s=0.2
+x.m l=20.0  s=0.5
 
 y.m l=-0.2  s=0.02
 y.m l=-0.1  s=0.02
@@ -23,38 +105,82 @@ y.m l=0.47  s=0.005
 y.m l=0.5   s=0.001
 y.m l=0.512 s=0.001
 y.m l=0.6   s=0.02
+y.m l=1.0   s=0.1       
+y.m l=2.0   s=0.3
 y.m l=3.0   s=0.5
 
-region num=1 x.min=0   x.max=20  y.min=0.512 y.max=3.0  mat=GaN
-region num=2 x.min=0   x.max=20  y.min=0.5   y.max=0.512 mat=AlGaN x.comp=0.20
-region num=3 x.min=4.0 x.max=5.0 y.min=0.4   y.max=0.5  mat=GaN
-region num=4 x.min=0   x.max=4.0 y.min=0.0   y.max=0.5  mat=Si3N4
-region num=5 x.min=5.0 x.max=20  y.min=0.0   y.max=0.5  mat=Si3N4
-region num=6 x.min=0   x.max=20  y.min=-0.2  y.max=0.0  mat=Si3N4
+# ----------------------------------------------------------------------------
+# REGIONS
+# ----------------------------------------------------------------------------
+region num=1 x.min=0   x.max=20  y.min=0.512 y.max=3.0   mat=GaN
+region num=2 x.min=0   x.max=20  y.min=0.5   y.max=0.512 mat=AlGaN x.comp=$Alcomp
+region num=3 x.min=4.0 x.max=5.0 y.min=0.4   y.max=0.5   mat=GaN
+region num=4 x.min=0   x.max=4.0 y.min=0.0   y.max=0.5   mat=Si3N4
+region num=5 x.min=5.0 x.max=20  y.min=0.0   y.max=0.5   mat=Si3N4
+region num=6 x.min=0   x.max=20  y.min=-0.2  y.max=0.0   mat=Si3N4
 
-elec num=1 name=source x.min=0.0  x.max=1.0  y.min=0.0  y.max=0.512
-elec num=2 name=drain  x.min=19.0 x.max=20   y.min=0.0  y.max=0.512
-elec num=3 name=gate   x.min=4.0  x.max=5.0  y.min=0.0  y.max=0.45
+# ----------------------------------------------------------------------------
+# ELECTRODES (dual-FP topology)
+# ----------------------------------------------------------------------------
+elec num=1 name=source x.min=0.0  x.max=1.0  y.min=0.0  y.max=0.512  
+elec num=2 name=drain  x.min=19.0 x.max=20   y.min=0.0  y.max=0.512   
+elec num=3 name=gate   x.min=4.0  x.max=5.0  y.min=0.0  y.max=0.45   
 elec num=4 name=gate   x.min=5.0  x.max=8.0  y.min=0.0  y.max=0.2
 elec num=5 name=source x.min=1.0  x.max=12.0 y.min=-0.2 y.max=-0.1
 elec num=6 name=source x.min=0.0  x.max=1.0  y.min=-0.2 y.max=0.0
 
-doping uniform p.type conc=1e18   x.min=4.0  x.max=5.0 y.min=0.47 y.max=0.5
-doping uniform p.type conc=1.5e19 x.min=4.0  x.max=5.0 y.min=0.40 y.max=0.47
-doping uniform n.type conc=1e21   x.min=0.0  x.max=1.0 y.min=0.5  y.max=0.6
-doping uniform n.type conc=1e21   x.min=19.0 x.max=20  y.min=0.5  y.max=0.6
+# ----------------------------------------------------------------------------
+# DOPING
+# ----------------------------------------------------------------------------
+doping uniform p.type conc=$NpgaN_top x.min=4.0  x.max=5.0 y.min=0.47 y.max=0.5
+doping uniform p.type conc=$NpgaN_bot x.min=4.0  x.max=5.0 y.min=0.40 y.max=0.47
+doping uniform n.type conc=$Nplus     x.min=0.0  x.max=1.0 y.min=0.5  y.max=0.6
+doping uniform n.type conc=$Nplus     x.min=19.0 x.max=20  y.min=0.5  y.max=0.6
 
-contact name=gate
+# ----------------------------------------------------------------------------
+# CONTACTS
+#   Gate work function = 5.1 eV (Ni/TiN on p-GaN, standard for E-mode GaN
+#   HEMTs). This is the primary Vth control knob — calibrate to hit
+#   Vth ~ 1.5-2 V if Phase 2 measurements diverge.
+#   Source/drain set to 3.93 eV for ohmic behavior on the n+ regions.
+# ----------------------------------------------------------------------------
+contact name=gate   work=5.1
 contact name=source work=3.93
 contact name=drain  work=3.93
 
-models srh fldmob print
+# ----------------------------------------------------------------------------
+# TRAP MODELS
+#   Buffer Fe-like deep acceptor (Ec-0.7 eV) governs off-state leakage and
+#   sets the lateral breakdown distribution under the GFP/SFP.
+#   AlGaN-side donor trap (Ec-0.5 eV) is a coarse proxy for the SiN/AlGaN
+#   interface state population that drives the virtual-gate effect and
+#   dynamic Ron. A finer interface-trap treatment is a Phase 1+ refinement.
+# ----------------------------------------------------------------------------
+trap region=1 acceptor e.level=0.7 density=$Nfe       degen=2 sign=1e-15 sigp=1e-15
+trap region=2 donor    e.level=0.5 density=$Nsurf_vol degen=2 sign=1e-14 sigp=1e-14
+
+# ----------------------------------------------------------------------------
+# PHYSICS MODELS (isothermal pass)
+# ----------------------------------------------------------------------------
+models srh fldmob fermi print
 mobility albrct.n
 model polarization calc.strain polar.scale=1.0
 
-output con.band val.band charge polar.charge band.par E.MOBILITY E.VELOCITY
+output con.band val.band charge polar.charge band.par e.mobility e.velocity
 method gummel newton itlimit=50 trap maxtrap=15 climit=1e-4
 
+# ============================================================================
+# PASS 1A — Equilibrium + transfer curve (isothermal), Vg = -2 to +4 V
+#   Sweep stops at Vg = 4 V on purpose. Past 4 V the metal/p-GaN/AlGaN gate
+#   diode forward-biases (Eg(GaN) = 3.4 eV plus small barrier offset), gate
+#   current Ig surges, hole injection collapses the 2DEG, and Id rolls off.
+#   That regime is real device physics but it is NOT useful operating data:
+#     - It confuses IC-CAP / ASM-HEMT optimizers (non-monotonic Id(Vg)).
+#     - It is outside the recommended Vgs window of every commercial p-GaN
+#       HEMT datasheet (Infineon CoolGaN, GaN Systems, Innoscience, EPC).
+#   The diode-turnon roll-off is demonstrated separately by the Vg = 6 V
+#   output-curve pass below; that is its proper home.
+# ============================================================================
 solve init
 save outf=ganon_gan_fp_0.str
 
@@ -64,17 +190,28 @@ solve vdrain=5.0
 solve name=gate vgate=0.0 vfinal=-2 vstep=-0.5
 
 log outf=ganon_gan_fp_transfer.log
-solve name=gate vgate=-2.0 vfinal=6 vstep=0.1
+solve name=gate vgate=-2.0 vfinal=4 vstep=0.1
 log off
 
-set on_vstop = 15
-set on_vinc  = 0.2
+extract init infile="ganon_gan_fp_transfer.log"
+extract name="vth_lin"  xintercept(maxslope(curve(v."gate", abs(i."drain"))))
+extract name="gm_peak"  slope(maxslope(curve(v."gate", abs(i."drain"))))
+extract name="ion_vg4"  y.val from curve(v."gate", abs(i."drain")) where x.val=4.0
 
+# ============================================================================
+# PASS 1B — Output curves @ Vg = 2, 4, 6 V (isothermal)
+#   Note: Vg = 6 V is included only to expose the p-GaN/AlGaN gate-diode
+#   turn-on; do NOT cite it as a usable operating point. Linear modulation
+#   ceiling is ~4 V, set by the GaN bandgap (3.4 eV).
+# ============================================================================
 solve init
 solve name=gate vgate=0.0 vfinal=2 vstep=0.5
 log outf=ganon_gan_fp_Vg2.log
 solve name=drain vdrain=0.0 vfinal=$on_vstop vstep=$on_vinc
 log off
+
+extract init infile="ganon_gan_fp_Vg2.log"
+extract name="ron_vg2"  1.0/slope(maxslope(curve(v."drain", abs(i."drain"))))
 
 solve init
 solve name=gate vgate=0.0 vfinal=4 vstep=0.5
@@ -82,29 +219,136 @@ log outf=ganon_gan_fp_Vg4.log
 solve name=drain vdrain=0.0 vfinal=$on_vstop vstep=$on_vinc
 log off
 
+extract init infile="ganon_gan_fp_Vg4.log"
+extract name="ron_vg4"  1.0/slope(maxslope(curve(v."drain", abs(i."drain"))))
+extract name="idsat_vg4" y.val from curve(v."drain", abs(i."drain")) where x.val=15.0
+
 solve init
 solve name=gate vgate=0.0 vfinal=6 vstep=0.5
 log outf=ganon_gan_fp_Vg6.log
 solve name=drain vdrain=0.0 vfinal=$on_vstop vstep=$on_vinc
 log off
 
-go atlas
-mesh inf=ganon_gan_fp_0.str width=100
-region modify num=1 substrate
+# ============================================================================
+# PASS 1C — Small-signal AC Y-parameters at compact-model bias grid
+#   6 bias points: (Vg,Vd) = (4,0), (2,5), (3,5), (4,5), (4,1), (4,10)
+#   The Vd=0 V point is essential for IC-CAP / ASM-HEMT C-V extraction —
+#   it lets the optimizer separate Cgs0 from Cgd0. Without it the two
+#   capacitances are always asymmetric and the fit is degenerate.
+#   Frequency 1 kHz to 10 GHz, 4 pts/decade.
+#   These logs feed IC-CAP for ASM-HEMT C-V and RF parameter fitting.
+#
+#   Manual ref (p.1609): "AC sinusoidal small-signal analysis ... full Newton
+#   method must be used for this analysis. This is typically specified with
+#   the statement: METHOD NEWTON CARRIERS=2"
+#   Manual ref (p.1610): "AC FREQ=1E6 FSTEP=10 MULT.F NFSTEP=5 VSS=0.01"
+# ============================================================================
+method newton carriers=2 climit=1e-4
 
-contact name=gate
+solve init
+solve vgate=4.0 vdrain=0.0
+log outf=ganon_gan_fp_yp_vg4_vd0.log
+solve ac freq=$ac_fstart fstep=$ac_fstep mult.f nfsteps=$ac_npts vss=0.01
+log off
+
+solve init
+solve vgate=2.0 vdrain=5.0
+log outf=ganon_gan_fp_yp_vg2_vd5.log
+solve ac freq=$ac_fstart fstep=$ac_fstep mult.f nfsteps=$ac_npts vss=0.01
+log off
+
+solve init
+solve vgate=3.0 vdrain=5.0
+log outf=ganon_gan_fp_yp_vg3_vd5.log
+solve ac freq=$ac_fstart fstep=$ac_fstep mult.f nfsteps=$ac_npts vss=0.01
+log off
+
+solve init
+solve vgate=4.0 vdrain=5.0
+log outf=ganon_gan_fp_yp_vg4_vd5.log
+solve ac freq=$ac_fstart fstep=$ac_fstep mult.f nfsteps=$ac_npts vss=0.01
+log off
+
+solve init
+solve vgate=4.0 vdrain=1.0
+log outf=ganon_gan_fp_yp_vg4_vd1.log
+solve ac freq=$ac_fstart fstep=$ac_fstep mult.f nfsteps=$ac_npts vss=0.01
+log off
+
+solve init
+solve vgate=4.0 vdrain=10.0
+log outf=ganon_gan_fp_yp_vg4_vd10.log
+solve ac freq=$ac_fstart fstep=$ac_fstep mult.f nfsteps=$ac_npts vss=0.01
+log off
+
+# ============================================================================
+# PASS 1D — Off-state breakdown (BVdss) with Selberherr impact ionization
+#   Reload the equilibrium structure, enable impact ionization, force the
+#   gate deep into cut-off (Vg = -2 V), then ramp the drain until the
+#   compliance current is hit. The corresponding Vd is BVdss.
+#   No region modify to substrate here — that is only needed when a
+#   thermcontact is on the back face (see Pass 2).
+#   Tighter dvmax + finer bv_vinc help convergence near the avalanche knee.
+# ============================================================================
+go atlas simflags="-P 2"
+mesh inf=ganon_gan_fp_0.str width=$Wmesh
+
+contact name=gate   work=5.1
 contact name=source work=3.93
 contact name=drain  work=3.93
 
-models srh fldmob lat.temp print
+trap region=1 acceptor e.level=0.7 density=$Nfe       degen=2 sign=1e-15 sigp=1e-15
+trap region=2 donor    e.level=0.5 density=$Nsurf_vol degen=2 sign=1e-14 sigp=1e-14
+
+models srh fldmob fermi print
+mobility albrct.n
+model polarization calc.strain polar.scale=1.0
+impact selb
+
+output con.band val.band charge polar.charge band.par e.mobility e.velocity
+method newton trap itlimit=200 maxtrap=50 climit=1e-3 dvmax=0.2
+
+solve init
+solve name=gate vgate=0.0 vfinal=-2 vstep=-0.5
+
+log outf=ganon_gan_fp_bvdss.log
+solve name=drain vdrain=0.0 vfinal=$bv_vstop vstep=$bv_vinc \
+      compl=$bv_compl cname=drain
+log off
+
+extract init infile="ganon_gan_fp_bvdss.log"
+extract name="bvdss"  x.val from curve(v."drain", abs(i."drain")) where y.val=$bv_compl
+
+save outf=ganon_gan_fp_breakdown.str
+
+# ============================================================================
+# PASS 2 — Self-heating (lat.temp) DC output curves @ Vg = 2, 3, 4 V
+#   Substrate back face held at 300 K. Realistic Tback under inverter load
+#   is 80..120 deg C — re-run this pass with ext.temp updated from Icepak
+#   feedback during Phase 2 if needed.
+#   dt.max=50 K caps each Newton step's temperature update; without it the
+#   coupled electro-thermal solver can diverge at high power density.
+# ============================================================================
+go atlas simflags="-P 2"
+mesh inf=ganon_gan_fp_0.str width=$Wmesh
+region modify num=1 substrate
+
+contact name=gate   work=5.1
+contact name=source work=3.93
+contact name=drain  work=3.93
+
+trap region=1 acceptor e.level=0.7 density=$Nfe       degen=2 sign=1e-15 sigp=1e-15
+trap region=2 donor    e.level=0.5 density=$Nsurf_vol degen=2 sign=1e-14 sigp=1e-14
+
+models srh fldmob fermi lat.temp print
 mobility albrct.n
 model polarization calc.strain polar.scale=1.0
 
 material material=GaN tcon.alma hc.alma
 thermcontact num=1 x.min=0 x.max=20 y.min=3 y.max=3 ext.temp=300 alpha=1e7
 
-output con.band val.band charge polar.charge band.par E.MOBILITY E.VELOCITY
-method newton trap itlimit=150 maxtrap=50 climit=1e-3 dvmax=0.1
+output con.band val.band charge polar.charge band.par e.mobility e.velocity lat.temp
+method newton trap itlimit=150 maxtrap=50 climit=1e-3 dvmax=0.1 dt.max=50
 
 solve init
 solve name=gate vgate=0.0 vfinal=2 vstep=0.1
@@ -128,10 +372,19 @@ log off
 
 save outf=ganon_gan_fp_thermal_peak.str
 
+# ============================================================================
+# RESULTS VIEWING (interactive only — comment out for batch / unattended runs)
+#
+# Note: AC Y-parameter logs (ganon_gan_fp_yp_*.log) are imported into IC-CAP
+# directly for ASM-HEMT compact-model fitting — they are not plotted in
+# Tonyplot here.
+# ============================================================================
 tonyplot ganon_gan_fp_transfer.log
 tonyplot -overlay ganon_gan_fp_Vg2.log     ganon_gan_fp_Vg4.log     ganon_gan_fp_Vg6.log
 tonyplot -overlay ganon_gan_fp_Vg2_lat.log ganon_gan_fp_Vg3_lat.log ganon_gan_fp_Vg4_lat.log
+tonyplot ganon_gan_fp_bvdss.log
 tonyplot ganon_gan_fp_0.str
+tonyplot ganon_gan_fp_breakdown.str
 tonyplot ganon_gan_fp_thermal_peak.str
 
 quit

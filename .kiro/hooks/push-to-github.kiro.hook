@@ -1,0 +1,15 @@
+{
+  "enabled": true,
+  "name": "Push to GitHub",
+  "description": "Manually triggered hook that stages all changes, creates a commit, and pushes the current branch to GitHub.",
+  "version": "1",
+  "when": {
+    "type": "postTaskExecution"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Push the current workspace to GitHub. Steps:\n1. Run `git status` to see what has changed.\n2. Run `git diff --stat` to summarize the changes.\n3. If there are uncommitted changes, stage them with `git add -A`, then create a commit with a concise, descriptive message based on the actual changes (do not use a generic message).\n4. Determine the current branch with `git rev-parse --abbrev-ref HEAD`.\n5. Push to the remote with `git push -u origin <branch>`. Never force push. Never push directly to main or master unless that is already the current branch and the user has been working on it.\n6. Report the result, including the commit hash and branch name. If the push fails (e.g., no remote configured, auth issue, non-fast-forward), explain the cause and suggest next steps rather than retrying destructively."
+  },
+  "workspaceFolderName": "P-GaN-FP-HEMT",
+  "shortName": "push-to-github"
+}
